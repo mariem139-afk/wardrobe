@@ -1,0 +1,164 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eeeae3"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<title>Bahaa's Wardrobe</title>
+<style>
+:root{--bg:#eeeae3;--paper:#faf8f4;--ink:#292925;--muted:#827f77;--line:#d8d2c8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:28px 20px 18px;text-align:center;border-bottom:1px solid var(--line)}
+.brand{font:500 11px Georgia,serif;letter-spacing:3px;color:var(--muted)}
+h1{font:500 25px Georgia,serif;letter-spacing:1px;margin:8px 0}.sub{font-size:11px;color:var(--muted);letter-spacing:1px}
+main{max-width:760px;margin:auto;padding:20px 16px 90px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 22px}
+.tab{border:1px solid var(--line);background:transparent;border-radius:3px;padding:13px 4px;color:var(--muted);font-size:11px;font-weight:600}
+.tab.active{background:var(--ink);color:#f8f5ef;border-color:var(--ink)}
+.sectionhead{display:flex;justify-content:space-between;align-items:center;margin:12px 2px 14px}
+.sectionhead h2{font:500 19px Georgia,serif;margin:0}
+button{cursor:pointer}.add{background:var(--ink);color:white;border:0;border-radius:3px;padding:11px 14px;font-size:12px;letter-spacing:0.5px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.outfit{background:var(--paper);border:1px solid var(--line);min-width:0}
+.cover{aspect-ratio:4/5;background:#e3dfd7;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#a09a90;font:italic 15px Georgia}
+.cover img{width:100%;height:100%;object-fit:cover}.info{padding:12px}.name{font:16px Georgia;margin:0 0 6px}
+.meta{font-size:11px;color:var(--muted);line-height:1.6}.actions{display:flex;gap:8px;margin-top:10px}
+.small{border:1px solid var(--line);background:transparent;padding:7px 9px;font-size:11px;color:var(--ink)}
+.empty{grid-column:1/-1;text-align:center;padding:42px 16px;color:var(--muted);background:var(--paper);border:1px dashed var(--line);font-size:13px;line-height:1.9}
+dialog{border:0;border-radius:4px;background:var(--paper);color:var(--ink);width:min(92vw,520px);padding:20px;max-height:88vh;overflow:auto}
+dialog::backdrop{background:#17161388}dialog h3{font:20px Georgia;margin:0 0 16px}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px}
+input,select,textarea{width:100%;padding:12px;border:1px solid var(--line);background:white;border-radius:2px;font:14px inherit;color:var(--ink)}
+textarea{min-height:65px}.preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.preview img{width:72px;height:86px;object-fit:cover}
+.modalactions{display:flex;gap:8px;margin-top:18px}.modalactions button{flex:1}
+footer{text-align:center;color:var(--muted);font:11px Georgia;padding:24px}
+.admin-bar{margin-top:12px}.admin-btn{background:none;border:0;color:var(--muted);font-size:10px;letter-spacing:1px;text-decoration:underline;opacity:0.6}
+@media(max-width:420px){.grid{gap:9px}.info{padding:10px}.name{font-size:14px}}
+</style></head><body>
+<header><div class="brand">BAHAA'S PRIVATE COLLECTION</div><h1>WARDROBE</h1><div class="sub">A PERSONAL STYLE ARCHIVE</div></header>
+<main><div class="tabs"><button class="tab active" data-cat="casual">CASUAL</button><button class="tab" data-cat="smart">SMART / OLD MONEY</button><button class="tab" data-cat="business">BUSINESS / FORMAL</button></div>
+<div class="sectionhead"><h2 id="catTitle">Casual Meeting</h2><button class="add" id="newBtn" style="display:none">＋ ADD LOOK</button></div><div class="grid" id="looks"></div></main>
+<footer>BAHAA'S WARDROBE · PERSONAL USE<div class="admin-bar"><button class="admin-btn" id="adminToggle">ADMIN LOGIN</button></div></footer>
+
+<dialog id="editor"><h3 id="formTitle">NEW LOOK</h3>
+<label>Look name</label><input id="lookName" placeholder="e.g. Green Quarter-Zip">
+<label>Category</label><select id="lookCat"><option value="casual">Casual Meeting</option><option value="smart">Smart / Old Money</option><option value="business">Business / Formal</option></select>
+<label>Full outfit photo</label><input id="coverInput" type="file" accept="image/*">
+<label>Pieces / notes</label><textarea id="notes" placeholder="Sweater · trousers · shoes..."></textarea><div class="preview" id="preview"></div>
+<div class="modalactions"><button class="add" id="saveBtn">SAVE LOOK</button><button class="small" id="cancelBtn">CANCEL</button></div></dialog>
+
+<script>
+const ADMIN_PASS = "1234";
+const DB_URL = ["https:", "", "firestore." + "googleapis" + ".com", "v1", "projects", "bahaa-wardrobe", "databases", "(default)", "documents", "looks"].join("/");
+let isAdmin = localStorage.getItem("wardrobe_admin") === "true";
+let active = 'casual', editing = null, coverDataUrl = '', cloudLooks = [];
+const titles = { casual: 'Casual Meeting', smart: 'Smart / Old Money', business: 'Business / Formal' };
+
+function render() {
+  document.getElementById('newBtn').style.display = isAdmin ? 'inline-block' : 'none';
+  document.getElementById('adminToggle').textContent = isAdmin ? 'ADMIN LOGOUT' : 'ADMIN LOGIN';
+  document.getElementById('catTitle').textContent = titles[active];
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.cat === active));
+  const root = document.getElementById('looks');
+  const filtered = cloudLooks.filter(x => x.cat === active);
+  root.innerHTML = filtered.length ? '' : '<div class="empty">No looks in this category yet.</div>';
+  filtered.forEach(x => {
+    const c = document.createElement('article'); c.className = 'outfit';
+    const cover = document.createElement('div'); cover.className = 'cover';
+    if (x.cover) { const im = document.createElement('img'); im.src = x.cover; cover.append(im); }
+    const info = document.createElement('div'); info.className = 'info';
+    const n = document.createElement('p'); n.className = 'name'; n.textContent = x.name;
+    const m = document.createElement('div'); m.className = 'meta'; m.textContent = x.notes || '';
+    info.append(n, m);
+    if (isAdmin) {
+      const a = document.createElement('div'); a.className = 'actions';
+      const e = document.createElement('button'); e.className = 'small'; e.textContent = 'EDIT'; e.onclick = () => openEditor(x);
+      const d = document.createElement('button'); d.className = 'small'; d.textContent = 'DELETE';
+      d.onclick = async () => {
+        if (confirm('Delete this look?')) {
+          await fetch(DB_URL + "/" + x.id, { method: 'DELETE' });
+          loadCloud();
+        }
+      };
+      a.append(e, d); info.append(a);
+    }
+    c.append(cover, info); root.append(c);
+  });
+}
+
+async function loadCloud() {
+  try {
+    const res = await fetch(DB_URL);
+    const data = await res.json();
+    cloudLooks = (data.documents || []).map(doc => {
+      const f = doc.fields || {};
+      return {
+        id: doc.name.split('/').pop(),
+        name: f.name?.stringValue || 'Look',
+        cat: f.cat?.stringValue || 'casual',
+        cover: f.cover?.stringValue || '',
+        notes: f.notes?.stringValue || ''
+      };
+    });
+    render();
+  } catch (e) { console.error(e); }
+}
+
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 700 / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('adminToggle').onclick = () => {
+  if (isAdmin) { isAdmin = false; localStorage.removeItem("wardrobe_admin"); render(); }
+  else {
+    const pass = prompt("Enter Admin Password:");
+    if (pass === ADMIN_PASS) { isAdmin = true; localStorage.setItem("wardrobe_admin", "true"); render(); }
+    else if (pass !== null) alert("Wrong password");
+  }
+};
+
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { active = b.dataset.cat; render(); });
+const dlg = document.getElementById('editor');
+
+function openEditor(x) {
+  editing = x || null; coverDataUrl = x?.cover || '';
+  document.getElementById('formTitle').textContent = x ? 'EDIT LOOK' : 'NEW LOOK';
+  document.getElementById('lookName').value = x?.name || '';
+  document.getElementById('lookCat').value = x?.cat || active;
+  document.getElementById('notes').value = x?.notes || '';
+  document.getElementById('coverInput').value = '';
+  document.getElementById('preview').innerHTML = coverDataUrl ? `<img src="${coverDataUrl}">` : '';
+  dlg.showModal();
+}
+
+document.getElementById('newBtn').onclick = () => openEditor();
+document.getElementById('cancelBtn').onclick = () => dlg.close();
+
+document.getElementById('coverInput').onchange = async (e) => {
+  const file = e.target.files.item(0);
+  if (file) {
+    document.getElementById('saveBtn').textContent = "Preparing...";
+    coverDataUrl = await compressImage(file);
+    document.getElementById('preview').innerHTML = `<img src="${coverDataUrl}">`;
+    document.getElementById('saveBtn').textContent = "SAVE LOOK";
+  }
+};
+
+document.getElementById('saveBtn').onclick = async () => {
+  const btn = document.getElementById('saveBtn'); btn.textContent = "Saving..."; btn.disabled = true;
+  try {
+    const body = JSON.stringify({
+      fields: {
+        name: { stringValue: document.getElementById('lookName').value.trim() || 'Untitled Look' },
