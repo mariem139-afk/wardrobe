@@ -44,6 +44,8 @@ footer{text-align:center;color:var(--muted);font:11px Georgia;padding:24px}
 <label>Pieces / notes</label><textarea id="notes" placeholder="Sweater · trousers · shoes..."></textarea><div class="preview" id="preview"></div>
 <div class="modalactions"><button class="add" id="saveBtn">SAVE LOOK</button><button class="small" id="cancelBtn">CANCEL</button></div></dialog>
 
+<dialog id="viewer" onclick="this.close()" style="padding:10px;text-align:center;background:#faf8f4;max-width:95vw"><img id="viewImg" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:2px"><div id="viewTitle" style="font:18px Georgia;margin-top:10px;color:#292925"></div><div id="viewNotes" style="font-size:12px;color:#827f77;margin-top:4px"></div><button class="small" style="margin-top:12px;width:100%">CLOSE</button></dialog>
+
 <script>
 const ADMIN_PASS = "1234";
 const DB_URL = ["https:", "", "firestore." + "googleapis" + ".com", "v1", "projects", "bahaa-wardrobe", "databases", "(default)", "documents", "looks"].join("/");
@@ -62,7 +64,18 @@ function render() {
   filtered.forEach(x => {
     const c = document.createElement('article'); c.className = 'outfit';
     const cover = document.createElement('div'); cover.className = 'cover';
-    if (x.cover) { const im = document.createElement('img'); im.src = x.cover; cover.append(im); }
+    if (x.cover) {
+      const im = document.createElement('img');
+      im.src = x.cover;
+      im.style.cursor = 'pointer';
+      im.onclick = () => {
+        document.getElementById('viewImg').src = x.cover;
+        document.getElementById('viewTitle').textContent = x.name;
+        document.getElementById('viewNotes').textContent = x.notes || '';
+        document.getElementById('viewer').showModal();
+      };
+      cover.append(im);
+    }
     const info = document.createElement('div'); info.className = 'info';
     const n = document.createElement('p'); n.className = 'name'; n.textContent = x.name;
     const m = document.createElement('div'); m.className = 'meta'; m.textContent = x.notes || '';
@@ -144,37 +157,3 @@ function openEditor(x) {
 }
 
 document.getElementById('newBtn').onclick = () => openEditor();
-document.getElementById('cancelBtn').onclick = () => dlg.close();
-
-document.getElementById('coverInput').onchange = async (e) => {
-  const file = e.target.files.item(0);
-  if (file) {
-    document.getElementById('saveBtn').textContent = "Preparing...";
-    coverDataUrl = await compressImage(file);
-    document.getElementById('preview').innerHTML = `<img src="${coverDataUrl}">`;
-    document.getElementById('saveBtn').textContent = "SAVE LOOK";
-  }
-};
-
-document.getElementById('saveBtn').onclick = async () => {
-  const btn = document.getElementById('saveBtn'); btn.textContent = "Saving..."; btn.disabled = true;
-  try {
-    const body = JSON.stringify({
-      fields: {
-        name: { stringValue: document.getElementById('lookName').value.trim() || 'Untitled Look' },
-        cat: { stringValue: document.getElementById('lookCat').value },
-        cover: { stringValue: coverDataUrl },
-        notes: { stringValue: document.getElementById('notes').value.trim() }
-      }
-    });
-    const url = editing && editing.id ? DB_URL + "/" + editing.id : DB_URL;
-    const method = editing && editing.id ? 'PATCH' : 'POST';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body });
-    dlg.close(); await loadCloud();
-  } catch (err) { alert("Error saving: " + err.message); }
-  btn.textContent = "SAVE LOOK"; btn.disabled = false;
-};
-
-render();
-loadCloud();
-</script></body></html>
