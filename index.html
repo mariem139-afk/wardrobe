@@ -162,3 +162,19 @@ document.getElementById('saveBtn').onclick = async () => {
     const body = JSON.stringify({
       fields: {
         name: { stringValue: document.getElementById('lookName').value.trim() || 'Untitled Look' },
+        cat: { stringValue: document.getElementById('lookCat').value },
+        cover: { stringValue: coverDataUrl },
+        notes: { stringValue: document.getElementById('notes').value.trim() }
+      }
+    });
+    const url = editing && editing.id ? DB_URL + "/" + editing.id : DB_URL;
+    const method = editing && editing.id ? 'PATCH' : 'POST';
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body });
+    dlg.close(); await loadCloud();
+  } catch (err) { alert("Error saving: " + err.message); }
+  btn.textContent = "SAVE LOOK"; btn.disabled = false;
+};
+
+render();
+loadCloud();
+</script></body></html>
